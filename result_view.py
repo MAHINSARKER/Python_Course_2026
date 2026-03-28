@@ -4,6 +4,8 @@ from tkinter import ttk, messagebox
 class Result:
     def __init__(self, roll, course, marks, grade):
         self.roll, self.course, self.marks, self.grade = roll, course, marks, grade
+
+    # Dictionary so save data to the CSV        
     def to_dict(self):
         return {"Roll": self.roll, "Course": self.course, "Marks": self.marks, "Grade": self.grade}
 
@@ -19,8 +21,10 @@ class ResultView(ct.CTkFrame):
         self.setup_ui()
         self.show_result_table()
 
+    # UI Setup 
     def setup_ui(self):
-        # Dynamically load student rolls and courses for the dropdowns
+
+        # Load students and courses
         student_rolls = [s["Roll"] for s in self.s_manager.get_all_students()]
         course_names = [c["Course Name"] for c in self.c_manager.get_all_courses()]
         
@@ -46,14 +50,14 @@ class ResultView(ct.CTkFrame):
         self.marks_entry = ct.CTkEntry(self, font=("Arial", 25), width=400, text_color="black", fg_color="white", border_width=1, border_color="black")
         self.marks_entry.place(x=50, y=270)
         
-        #  Grade Display (Read-Only) 
+        #  Grade Display
         ct.CTkLabel(self, text="Auto-Calculated Grade:", font=("Arial", 25), text_color="black").place(x=50, y=320)
         self.grade_entry = ct.CTkEntry(self, font=("Arial", 25), width=400, text_color="gray", fg_color="#F0F0F0", border_width=1, border_color="black")
         self.grade_entry.place(x=50, y=360)
         self.grade_entry.insert(0, "Will calculate on save...")
-        self.grade_entry.configure(state="disabled") # Prevent manual typing
+        self.grade_entry.configure(state="disabled") 
 
-        #  Button Frame 
+        #  Buttons
         btn_frame = ct.CTkFrame(self, fg_color="transparent")
         btn_frame.place(x=50, y=440)
         ct.CTkButton(btn_frame, text="Save", width=100, font=("Arial", 25), command=self.save_result).pack(side="left", padx=10)
@@ -67,48 +71,56 @@ class ResultView(ct.CTkFrame):
         ct.CTkButton(self, text="Search", width=100, font=("Arial", 25), command=self.search_result).place(x=920, y=90)
         ct.CTkButton(self, text="Clear", width=100, font=("Arial", 25), command=self.clear_search_view).place(x=1040, y=90)
 
+    # Table
     def show_result_table(self, filtered=None):
-        if self.R_Frame: self.R_Frame.destroy()
+        if self.R_Frame: 
+            self.R_Frame.destroy()
         
         self.R_Frame = ct.CTkFrame(self, fg_color="white", width=1100, height=450)
         self.R_Frame.place(x=550, y=140)
         
-        data = filtered if filtered else self.r_manager.get_all_results()
+        # --- FIXED: TRUE INDEXING LOGIC ---
+        all_results = self.r_manager.get_all_results()
+        data = filtered if filtered is not None else all_results
         
-        self.Table = ttk.Treeview(self.R_Frame, columns=("r","c","m","g"), show="headings")
-        cols = {"r":"Roll Number", "c":"Course", "m":"Marks", "g":"Grade"}
+        self.Table = ttk.Treeview(self.R_Frame, columns=("roll_number","course_name","marks","grade"), show="headings")
+        cols = {"roll_number":"Roll", "course_name":"Course", "marks":"Marks", "grade":"Grade"}
         for k, v in cols.items(): 
             self.Table.heading(k, text=v)
         
-        self.Table.column("r", width=150, anchor="center")
-        self.Table.column("c", width=350, anchor="w")
-        self.Table.column("m", width=150, anchor="center")
-        self.Table.column("g", width=150, anchor="center")
-        
+        self.Table.column("roll_number", width=150, anchor="center")
+        self.Table.column("course_name", width=350, anchor="w")
+        self.Table.column("marks", width=150, anchor="center")
+        self.Table.column("grade", width=150, anchor="center")
+
         scroll_y = ttk.Scrollbar(self.R_Frame, orient="vertical", command=self.Table.yview)
         self.Table.configure(yscrollcommand=scroll_y.set)
         scroll_y.pack(side="right", fill="y")
         self.Table.pack(fill="both", expand=True)
         
+        # --- FIXED: INSERT DATA USING TRUE DB INDEX ---
         for i, r in enumerate(data): 
-            self.Table.insert("", "end", iid=i, values=(r["Roll"], r["Course"], r["Marks"], r["Grade"]))
+            true_index = all_results.index(r)
+            self.Table.insert("", "end", iid=true_index, values=(r["Roll"], r["Course"], r["Marks"], r["Grade"]))
         self.Table.bind("<<TreeviewSelect>>", self.on_select)
 
+    # Auto Grade Calculator
     def calculate_grade(self, marks):
         m = int(marks)
-        if m >= 90: return "A+"
-        elif m >= 85: return "A"
-        elif m >= 80: return "B+"
-        elif m >= 75: return "B"
-        elif m >= 70: return "C+"
-        elif m >= 65: return "C"
-        elif m >= 60: return "D"
+        if m >= 80: return "A+"
+        elif m >= 70: return "A"
+        elif m >= 60: return "A-"
+        elif m >= 50: return "B"
+        elif m >= 40: return "C+"
+        elif m >= 33: return "D"
+        elif m <= 32: return "F"
         else: return "F"
-
+ 
+    # Table Select
     def on_select(self, event):
         sel = self.Table.selection()
         if not sel: return
-        self.selected_index = int(sel[0])
+        self.selected_index = int(sel[0]) # Now properly grabs the real DB index
         r = self.r_manager.get_all_results()[self.selected_index]
         
         self.marks_entry.delete(0, "end")
@@ -116,79 +128,107 @@ class ResultView(ct.CTkFrame):
         self.course_combo.set(r["Course"])
         self.marks_entry.insert(0, r["Marks"])
         
-        # Update the read-only grade field
         self.grade_entry.configure(state="normal")
         self.grade_entry.delete(0, "end")
         self.grade_entry.insert(0, r["Grade"])
         self.grade_entry.configure(state="disabled")
 
+    # Clear Inputs
     def clear_entries(self):
         self.marks_entry.delete(0, "end")
         self.grade_entry.configure(state="normal")
         self.grade_entry.delete(0, "end")
         self.grade_entry.insert(0, "Will calculate on save...")
         self.grade_entry.configure(state="disabled")
+        
+        # --- FIXED: RESET DROPDOWNS ---
+        if self.roll_combo.cget("values"):
+            self.roll_combo.set(self.roll_combo.cget("values")[0])
+        if self.course_combo.cget("values"):
+            self.course_combo.set(self.course_combo.cget("values")[0])
 
+    # Clear Search
     def clear_search_view(self):
         self.search_entry.delete(0, 'end')
         self.show_result_table()
 
+    # Save Result
     def save_result(self):
-        r = self.roll_combo.get().strip()
-        c = self.course_combo.get().strip()
-        m = self.marks_entry.get().strip()
+        roll_number = self.roll_combo.get().strip()
+        course_name = self.course_combo.get().strip()
+        marks = self.marks_entry.get().strip()
         
-        if not r or not c or not m or r == "No Students Found" or c == "No Courses Found": 
-            messagebox.showerror("Input Error", "Valid Roll, Course, and Marks are required!")
+        if not roll_number or not course_name or not marks:
+            messagebox.showerror("Input Error", "Please fill out all fields!")
             return
             
-        if not m.isdigit():
+        if roll_number == "No Students Found" or course_name == "No Courses Found":
+            messagebox.showerror("Database Error", "You must enter a Student and a Course first!")
+            return
+            
+        if not marks.isdigit():
             messagebox.showerror("Format Error", "Marks must be a whole number.")
             return
             
-        if not (0 <= int(m) <= 100):
+        if len(marks) > 3:
+            messagebox.showerror("Format Error", "Marks can have highest 3 digits.")
+            return
+
+        if not (0 <= int(marks) <= 100):
             messagebox.showerror("Limit Error", "Marks must be between 0 and 100.")
             return
 
-        grade = self.calculate_grade(m)
+        grade = self.calculate_grade(marks)
         
-        success, msg = self.r_manager.add_result(Result(r, c, m, grade))
+        success, msg = self.r_manager.add_result(Result(roll_number, course_name, marks, grade))
         if success:
-            messagebox.showinfo("Success", f"Grade {grade} saved for Roll {r}!")
+            messagebox.showinfo("Success", f"Grade {grade} saved for Roll {roll_number}!")
             self.clear_entries()
             self.show_result_table()
         else:
             messagebox.showerror("Duplicate Error", msg)
 
+    # Update Result
     def update_result(self):
         if self.selected_index is None: 
             messagebox.showwarning("Selection Error", "Please click a row in the table to select it first!")
             return
             
-        r = self.roll_combo.get().strip()
-        c = self.course_combo.get().strip()
-        m = self.marks_entry.get().strip()
+        roll_number = self.roll_combo.get().strip()
+        course_name = self.course_combo.get().strip()
+        marks = self.marks_entry.get().strip()
         
-        if not r or not c or not m: 
+        if not roll_number or not course_name or not marks: 
             messagebox.showerror("Input Error", "All fields are required!")
             return
             
-        if not m.isdigit():
+        if not marks.isdigit():
             messagebox.showerror("Format Error", "Marks must be a whole number.")
             return
+
+        if len(marks) > 3:
+            messagebox.showerror("Format Error", "Marks can have highest 3 digits.")
+            return
             
-        if not (0 <= int(m) <= 100):
+        if not (0 <= int(marks) <= 100):
             messagebox.showerror("Limit Error", "Marks must be between 0 and 100.")
             return
 
-        grade = self.calculate_grade(m)
+        # --- FIXED: DUPLICATE CHECK FOR UPDATES ---
+        for i, r in enumerate(self.r_manager.get_all_results()):
+            if i != self.selected_index and r["Roll"] == roll_number and r["Course"] == course_name:
+                messagebox.showerror("Duplicate Error", "This student already has a grade for this course!")
+                return
+
+        grade = self.calculate_grade(marks)
         
-        self.r_manager.update_result(self.selected_index, Result(r, c, m, grade))
+        self.r_manager.update_result(self.selected_index, Result(roll_number, course_name, marks, grade))
         messagebox.showinfo("Success", "Result updated successfully!")
         self.selected_index = None
         self.clear_entries()
         self.show_result_table()
 
+    # Delete Result
     def delete_result(self):
         if self.selected_index is None: 
             messagebox.showwarning("Selection Error", "Please select a result from the table to delete.")
@@ -201,6 +241,7 @@ class ResultView(ct.CTkFrame):
             self.clear_entries()
             self.show_result_table()
 
+    # Search Result
     def search_result(self):
         query = self.search_entry.get().strip()
         if not query:

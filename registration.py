@@ -6,65 +6,94 @@ class RegistrationWindow(ct.CTk):
     def __init__(self):
         super().__init__()
         self.title("Register New Account")
-        self.geometry("600x550")
-        self.configure(fg_color="grey")
+        self.geometry("700x700") 
+        self.configure(fg_color="white")
         self.setup_ui()
 
-    def setup_ui(self):
-        frame = ct.CTkFrame(self, fg_color="white", corner_radius=15, width=500, height=450)
-        frame.place(relx=0.5, rely=0.5, anchor="center")
+    # Setup Ui
+    def setup_ui(self):        
+        ct.CTkLabel(self, text="Create Account", font=("Arial", 35, "bold"), text_color="black").place(x=220, y=30)
 
-        ct.CTkLabel(frame, text="Create Account", font=("Arial", 35, "bold"), text_color="black").place(x=120, y=40)
+        # Full Name Input
+        ct.CTkLabel(self, text="Full Name:", font=("Arial", 25), text_color="black").place(x=150, y=100)
+        self.name_entry = ct.CTkEntry(self, font=("Arial", 25), width=400, fg_color="#F0F0F0", text_color="black", border_width=1)
+        self.name_entry.place(x=150, y=140)
 
-        ct.CTkLabel(frame, text="Username:", font=("Arial", 20), text_color="black").place(x=50, y=120)
-        self.user_entry = ct.CTkEntry(frame, font=("Arial", 20), width=400, fg_color="white", text_color="black")
-        self.user_entry.place(x=50, y=160)
+        # Phone Number Input
+        ct.CTkLabel(self, text="Phone Number:", font=("Arial", 25), text_color="black").place(x=150, y=190)
+        self.phone_entry = ct.CTkEntry(self, font=("Arial", 25), width=400, fg_color="#F0F0F0", text_color="black", border_width=1)
+        self.phone_entry.place(x=150, y=230)
 
-        ct.CTkLabel(frame, text="Password:", font=("Arial", 20), text_color="black").place(x=50, y=210)
-        self.pass_entry = ct.CTkEntry(frame, font=("Arial", 20), width=400, fg_color="white", text_color="black", show="*")
-        self.pass_entry.place(x=50, y=250)
+        # Username Input
+        ct.CTkLabel(self, text="Username:", font=("Arial", 25), text_color="black").place(x=150, y=280)
+        self.user_entry = ct.CTkEntry(self, font=("Arial", 25), width=400, fg_color="#F0F0F0", text_color="black", border_width=1)
+        self.user_entry.place(x=150, y=320)
 
-        ct.CTkLabel(frame, text="Confirm Password:", font=("Arial", 20), text_color="black").place(x=50, y=300)
-        self.confirm_entry = ct.CTkEntry(frame, font=("Arial", 20), width=400, fg_color="white", text_color="black", show="*")
-        self.confirm_entry.place(x=50, y=340)
+        # Password Input
+        ct.CTkLabel(self, text="Password:", font=("Arial", 25), text_color="black").place(x=150, y=370)
+        self.pass_entry = ct.CTkEntry(self, font=("Arial", 25), width=400, fg_color="#F0F0F0", text_color="black", show="*", border_width=1)
+        self.pass_entry.place(x=150, y=410)
 
-        ct.CTkButton(frame, text="Register", font=("Arial", 20, "bold"), width=400, height=45, command=self.register_user).place(x=50, y=400)
-        ct.CTkButton(frame, text="Back to Home", font=("Arial", 15), fg_color="transparent", text_color="blue", hover_color="#E0E0E0", command=self.go_back).place(x=190, y=460)
+        # Confirm Password Input
+        ct.CTkLabel(self, text="Confirm Password:", font=("Arial", 25), text_color="black").place(x=150, y=460)
+        self.confirm_entry = ct.CTkEntry(self, font=("Arial", 25), width=400, fg_color="#F0F0F0", text_color="black", show="*", border_width=1)
+        self.confirm_entry.place(x=150, y=500)
 
+        # Buttons
+        ct.CTkButton(self, text="Register", font=("Arial", 25, "bold"), width=400, height=45, command=self.register_user).place(x=150, y=570)
+        ct.CTkButton(self, text="Back to Home", font=("Arial", 25), width=400, height=45, fg_color="transparent", text_color="black", hover_color="#E0E0E0", command=self.go_back).place(x=150, y=625)
+
+    # Register User Function
     def register_user(self):
-        u = self.user_entry.get().strip()
-        p = self.pass_entry.get().strip()
-        c = self.confirm_entry.get().strip()
+        name = self.name_entry.get().strip()
+        phone = self.phone_entry.get().strip()
+        username = self.user_entry.get().strip()
+        password = self.pass_entry.get().strip()
+        confirm_password = self.confirm_entry.get().strip()
 
-        if not u or not p or not c:
+        # Empty Check
+        if not name or not phone or not username or not password or not confirm_password:
             messagebox.showerror("Error", "All fields are required!")
             return
+            
+        # Phone Validation
+        if not phone.isdigit() and len(phone) !=11:
+            messagebox.showerror("Format Error", "Phone Number must contain only numbers and has to be 11 digits only.")
+            return
         
-        if p != c:
+        # 3. Password Check
+        if password != confirm_password:
             messagebox.showerror("Error", "Passwords do not match!")
             return
-
+        
+        if len(password) <8:
+            messagebox.showerror("Error", "Passwords should be 8 characters long")
+            return
+        
+        # Check Existing Username
         file_exists = True
         try:
             with open("users.csv", "r") as file:
                 reader = csv.DictReader(file)
                 for row in reader:
-                    if row["Username"].lower() == u.lower():
+                    if row["Username"].lower() == username.lower():
                         messagebox.showerror("Error", "Username already exists!")
                         return
         except FileNotFoundError:
             file_exists = False
 
-        # Save new user
+        # Save new user to CSV
         with open("users.csv", "a", newline="") as file:
-            writer = csv.DictWriter(file, fieldnames=["Username", "Password"])
+            writer = csv.DictWriter(file, fieldnames=["Name", "Phone", "Username", "Password"])
             if not file_exists:
                 writer.writeheader()
-            writer.writerow({"Username": u, "Password": p})
+            
+            writer.writerow({"Name": name, "Phone": phone, "Username": username, "Password": password})
 
         messagebox.showinfo("Success", "Account created successfully! Please log in.")
         self.go_back()
 
+    # Return to Home Screen
     def go_back(self):
         self.destroy()
         import main
@@ -73,6 +102,3 @@ class RegistrationWindow(ct.CTk):
 def run():
     app = RegistrationWindow()
     app.mainloop()
-
-if __name__ == "__main__":
-    run()
